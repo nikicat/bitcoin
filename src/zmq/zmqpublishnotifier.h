@@ -10,6 +10,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <functional>
+#include <thread>
 
 class CBlock;
 class CBlockIndex;
@@ -19,6 +20,11 @@ class CZMQAbstractPublishNotifier : public CZMQAbstractNotifier
 {
 private:
     uint32_t nSequence {0U}; //!< upcounting per message sequence number
+    void* msocket{nullptr};
+    std::thread m_thread_monitor;
+
+    void ReadMonitorLoop();
+    int ReadMonitorEvent();
 
 public:
 

@@ -2,6 +2,7 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
+#include <cstdio>
 #include <zmq/zmqpublishnotifier.h>
 
 #include <chain.h>
@@ -21,6 +22,7 @@
 #include <uint256.h>
 #include <version.h>
 #include <zmq/zmqutil.h>
+#include <util/thread.h>
 
 #include <zmq.h>
 
@@ -146,6 +148,34 @@ bool CZMQAbstractPublishNotifier::Initialize(void *pcontext)
             return false;
         }
 
+        auto mon_sock_url = strprintf("inproc://monitor-%x", psocket);
+        rc = zmq_socket_monitor (psocket, mon_sock_url.c_str(), ZMQ_EVENT_ALL);
+        if (rc != 0)
+        {
+            zmqError("Failed to monitor socket");
+            zmq_close(psocket);
+            return false;
+        }
+        msocket = zmq_socket (pcontext, ZMQ_PAIR);
+        if (!msocket)
+        {
+            zmqError("Failed to create monitoring socket");
+            return false;
+        }
+
+        //  Connect these to the inproc endpoints so they'll get events
+        rc = zmq_connect (msocket, mon_sock_url.c_str());
+        if (rc != 0)
+        {
+            zmqError("Failed to connect to monitor socket");
+            zmq_close(msocket);
+            zmq_close(psocket);
+            return false;
+        }
+
+        LogPrint(BCLog::ZMQ, "Starting monitor thread for socket %s [%s]\n", mon_sock_url, address);
+        m_thread_monitor = std::thread(&util::TraceThread, mon_sock_url, [this] { ReadMonitorLoop(); });
+
         rc = zmq_bind(psocket, address.c_str());
         if (rc != 0)
         {
@@ -168,6 +198,94 @@ bool CZMQAbstractPublishNotifier::Initialize(void *pcontext)
 
         return true;
     }
+}
+
+void close_zero_linger (void *socket)
+{
+    int linger = 0;
+    zmq_setsockopt (socket, ZMQ_LINGER, &linger, sizeof(linger));
+    zmq_close (socket);
+}
+
+void CZMQAbstractPublishNotifier::ReadMonitorLoop()
+{
+    LogPrint(BCLog::ZMQ, "Started monitor thread\n");
+    while (1) {
+        auto rc = ReadMonitorEvent();
+        if (rc < -1) {
+            zmqError(strprintf("Error in monitor loop: %d\n", rc));
+            break;
+        }
+        if (rc == ZMQ_EVENT_CLOSED || rc == ZMQ_EVENT_DISCONNECTED || rc == -1) {
+            break;
+        }
+    }
+    LogPrint(BCLog::ZMQ, "Closing monitor socket %x\n", msocket);
+    close_zero_linger (msocket);
+}
+
+static const char* decode_event(int event)
+{
+    switch (event) {
+    case ZMQ_EVENT_CONNECTED:
+        return "CONNECTED";
+    case ZMQ_EVENT_CONNECT_DELAYED:
+        return "CONNECT_DELAYED";
+    case ZMQ_EVENT_CONNECT_RETRIED:
+        return "CONNECT_RETRIED";
+    case ZMQ_EVENT_LISTENING:
+        return "LISTENING";
+    case ZMQ_EVENT_BIND_FAILED:
+        return "BIND_FAILED";
+    case ZMQ_EVENT_ACCEPTED:
+        return "ACCEPTED";
+    case ZMQ_EVENT_ACCEPT_FAILED:
+        return "ACCEPT_FAILED";
+    case ZMQ_EVENT_CLOSED:
+        return "CLOSED";
+    case ZMQ_EVENT_CLOSE_FAILED:
+        return "CLOSE_FAILED";
+    case ZMQ_EVENT_DISCONNECTED:
+        return "DISCONNECTED";
+    case ZMQ_EVENT_MONITOR_STOPPED:
+        return "MONITOR_STOPPED";
+    case ZMQ_EVENT_HANDSHAKE_SUCCEEDED:
+        return "HANDSHAKE_SUCCEEDED";
+    default:
+        return "UNKNOWN";
+    }
+}
+
+int CZMQAbstractPublishNotifier::ReadMonitorEvent()
+{
+    //  First frame in message contains event number and value
+    zmq_msg_t msg;
+    zmq_msg_init (&msg);
+    if (zmq_msg_recv (&msg, msocket, 0) == -1)
+        return -1;              //  Interrupted, presumably
+    if (!zmq_msg_more (&msg)) {
+        return -2;
+    }
+
+    uint8_t *data = (uint8_t *) zmq_msg_data (&msg);
+    uint16_t event = *(uint16_t *) (data);
+    int value = *(uint32_t *) (data + 2);
+
+    //  Second frame in message contains event address
+    zmq_msg_init (&msg);
+    if (zmq_msg_recv (&msg, msocket, 0) == -1)
+        return -3;              //  Interrupted, presumably
+    if (zmq_msg_more (&msg)) {
+        return -4;
+    }
+
+    data = (uint8_t *) zmq_msg_data (&msg);
+    size_t size = zmq_msg_size (&msg);
+    auto address = (char *) malloc (size + 1);
+    memcpy (address, data, size);
+    address[size] = 0;
+    LogPrint(BCLog::ZMQ, "Monitor event: %s (0x%x) %d %s\n", decode_event(event), event, value, address);
+    return event;
 }
 
 void CZMQAbstractPublishNotifier::Shutdown()
@@ -196,6 +314,10 @@ void CZMQAbstractPublishNotifier::Shutdown()
         int linger = 0;
         zmq_setsockopt(psocket, ZMQ_LINGER, &linger, sizeof(linger));
         zmq_close(psocket);
+
+        if (m_thread_monitor.joinable()) {
+            m_thread_monitor.join();
+        }
     }
 
     psocket = nullptr;
