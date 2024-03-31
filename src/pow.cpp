@@ -20,10 +20,25 @@ unsigned int GetNextWorkRequired(const CBlockIndex* pindexLast, const CBlockHead
     {
         if (params.fPowAllowMinDifficultyBlocks)
         {
+            uint8_t target_spacing_multiplier{2};
+
+            // Testnet4
+            if (params.hashGenesisBlock == uint256S("0x000000008d6faa98083fa55742aa82d4ed249bd1bfc3239c706e0a61ef9e3931")) {
+                // Reset limit of Testnet4 is just above difficulty 1M.
+                nProofOfWorkLimit = 0x1b0010c6U;
+                if (pindexLast->nBits > nProofOfWorkLimit) {
+                    // Last block already had less difficulty than our adjusted
+                    // limit, so don't make it even harder.
+                    return pindexLast->nBits;
+                }
+                // Difficulty is adjusted after 6 hours in Testnet4.
+                target_spacing_multiplier = 36;
+            }
+
             // Special difficulty rule for testnet:
-            // If the new block's timestamp is more than 2* 10 minutes
+            // If the new block's timestamp is more than 2* 10 minutes (6h for Testnet4)
             // then allow mining of a min-difficulty block.
-            if (pblock->GetBlockTime() > pindexLast->GetBlockTime() + params.nPowTargetSpacing*2)
+            if (pblock->GetBlockTime() > pindexLast->GetBlockTime() + params.nPowTargetSpacing * target_spacing_multiplier)
                 return nProofOfWorkLimit;
             else
             {
@@ -61,7 +76,19 @@ unsigned int CalculateNextWorkRequired(const CBlockIndex* pindexLast, int64_t nF
     // Retarget
     const arith_uint256 bnPowLimit = UintToArith256(params.powLimit);
     arith_uint256 bnNew;
-    bnNew.SetCompact(pindexLast->nBits);
+
+    // Testnet4
+    if (params.fPowAllowMinDifficultyBlocks && params.hashGenesisBlock == uint256S("0x000000008d6faa98083fa55742aa82d4ed249bd1bfc3239c706e0a61ef9e3931")) {
+        // Use the last non-special-min-difficulty-rules-block
+        const CBlockIndex* pindex = pindexLast;
+        const unsigned int pow_reset_min{0x1b0010c6U};
+        while (pindex->pprev && pindex->nHeight % params.DifficultyAdjustmentInterval() != 0 && pindex->nBits == pow_reset_min)
+            pindex = pindex->pprev;
+        bnNew.SetCompact(pindex->nBits);
+    } else {
+        bnNew.SetCompact(pindexLast->nBits);
+    }
+
     bnNew *= nActualTimespan;
     bnNew /= params.nPowTargetTimespan;
 

@@ -69,6 +69,11 @@ BOOST_AUTO_TEST_CASE(get_difficulty_for_high_target)
     TestDifficulty(0x1cf88f6f, 1.029916);
 }
 
+BOOST_AUTO_TEST_CASE(get_difficulty_for_1m_target)
+{
+    TestDifficulty(0x1b0010c6, 1000210.00465);
+}
+
 BOOST_AUTO_TEST_CASE(get_difficulty_for_very_high_target)
 {
     TestDifficulty(0x12345678, 5913134931067755359633408.0);
