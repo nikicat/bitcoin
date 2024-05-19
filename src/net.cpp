@@ -3042,6 +3042,10 @@ bool CConnman::BindListenPort(const CService& addrBind, bilingual_str& strError,
         strError = strprintf(Untranslated("Error setting SO_REUSEADDR on socket: %s, continuing anyway"), NetworkErrorString(WSAGetLastError()));
         LogPrintf("%s\n", strError.original);
     }
+    if (sock->SetSockOpt(SOL_SOCKET, SO_REUSEPORT, (sockopt_arg_type)&nOne, sizeof(int)) == SOCKET_ERROR) {
+        strError = strprintf(Untranslated("Error setting SO_REUSEPORT on socket: %s, continuing anyway"), NetworkErrorString(WSAGetLastError()));
+        LogPrintf("%s\n", strError.original);
+    }
 
     // some systems don't have IPV6_V6ONLY but are always v6only; others do have the option
     // and enable it by default or not. Try to enable it, if possible.
