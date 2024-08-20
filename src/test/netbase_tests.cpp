@@ -105,16 +105,16 @@ BOOST_AUTO_TEST_CASE(netbase_splithost)
     BOOST_CHECK(TestSplitHost("[]:70001", "[]:70001", 0, false));
     BOOST_CHECK(TestSplitHost("[]:-1", "[]:-1", 0, false));
     BOOST_CHECK(TestSplitHost("[]:-0", "[]:-0", 0, false));
-    BOOST_CHECK(TestSplitHost("[]:0", "", 0, false));
+    BOOST_CHECK(TestSplitHost("[]:0", "", 0, true));
     BOOST_CHECK(TestSplitHost("[]:1/2", "[]:1/2", 0, false));
     BOOST_CHECK(TestSplitHost("[]:1E2", "[]:1E2", 0, false));
     BOOST_CHECK(TestSplitHost("127.0.0.1:65536", "127.0.0.1:65536", 0, false));
-    BOOST_CHECK(TestSplitHost("127.0.0.1:0", "127.0.0.1", 0, false));
+    BOOST_CHECK(TestSplitHost("127.0.0.1:0", "127.0.0.1", 0, true));
     BOOST_CHECK(TestSplitHost("127.0.0.1:", "127.0.0.1:", 0, false));
     BOOST_CHECK(TestSplitHost("127.0.0.1:1/2", "127.0.0.1:1/2", 0, false));
     BOOST_CHECK(TestSplitHost("127.0.0.1:1E2", "127.0.0.1:1E2", 0, false));
     BOOST_CHECK(TestSplitHost("www.bitcoincore.org:65536", "www.bitcoincore.org:65536", 0, false));
-    BOOST_CHECK(TestSplitHost("www.bitcoincore.org:0", "www.bitcoincore.org", 0, false));
+    BOOST_CHECK(TestSplitHost("www.bitcoincore.org:0", "www.bitcoincore.org", 0, true));
     BOOST_CHECK(TestSplitHost("www.bitcoincore.org:", "www.bitcoincore.org:", 0, false));
 }
 
