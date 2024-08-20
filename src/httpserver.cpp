@@ -389,6 +389,16 @@ static bool HTTPBindAddresses(struct evhttp* http)
                 LogPrintf("WARNING: the RPC server is not safe to expose to untrusted networks such as the public internet\n");
             }
             boundSockets.push_back(bind_handle);
+            auto sock_fd = evhttp_bound_socket_get_fd(bind_handle);
+            struct sockaddr_storage sockaddr_bind;
+            socklen_t sockaddr_bind_len = sizeof(sockaddr_bind);
+            if (!getsockname(sock_fd, (struct sockaddr*)&sockaddr_bind, &sockaddr_bind_len)) {
+                CService service;
+                service.SetSockAddr((const struct sockaddr*)&sockaddr_bind);
+                LogPrintf("Bound RPC to %s\n", service.ToStringAddrPort());
+            } else {
+                LogPrintLevel(BCLog::RPC, BCLog::Level::Warning, "getsockname failed\n");
+            }
         } else {
             LogPrintf("Binding RPC on address %s port %i failed.\n", i->first, i->second);
         }

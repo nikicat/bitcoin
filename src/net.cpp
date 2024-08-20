@@ -3015,7 +3015,7 @@ void CConnman::ThreadI2PAcceptIncoming()
     }
 }
 
-bool CConnman::BindListenPort(const CService& addrBind, bilingual_str& strError, NetPermissionFlags permissions)
+bool CConnman::BindListenPort(const CService& addrBind, bilingual_str& strError, NetPermissionFlags permissions, const std::string& service)
 {
     int nOne = 1;
 
@@ -3070,7 +3070,7 @@ bool CConnman::BindListenPort(const CService& addrBind, bilingual_str& strError,
         LogPrintLevel(BCLog::NET, BCLog::Level::Error, "%s\n", strError.original);
         return false;
     }
-    LogPrintf("Bound to %s\n", addrBind.ToStringAddrPort());
+    LogPrintf("Bound to %s [%s]\n", GetBindAddress(*sock).ToStringAddrPort(), service);
 
     // Listen for incoming connections
     if (sock->Listen(SOMAXCONN) == SOCKET_ERROR)
@@ -3177,12 +3177,12 @@ uint16_t CConnman::GetDefaultPort(const std::string& addr) const
     return a.SetSpecial(addr) ? GetDefaultPort(a.GetNetwork()) : m_params.GetDefaultPort();
 }
 
-bool CConnman::Bind(const CService& addr_, unsigned int flags, NetPermissionFlags permissions)
+bool CConnman::Bind(const CService& addr_, unsigned int flags, NetPermissionFlags permissions, const std::string& service)
 {
     const CService addr{MaybeFlipIPv6toCJDNS(addr_)};
 
     bilingual_str strError;
-    if (!BindListenPort(addr, strError, permissions)) {
+    if (!BindListenPort(addr, strError, permissions, service)) {
         if ((flags & BF_REPORT_ERROR) && m_client_interface) {
             m_client_interface->ThreadSafeMessageBox(strError, "", CClientUIInterface::MSG_ERROR);
         }
@@ -3199,17 +3199,17 @@ bool CConnman::Bind(const CService& addr_, unsigned int flags, NetPermissionFlag
 bool CConnman::InitBinds(const Options& options)
 {
     for (const auto& addrBind : options.vBinds) {
-        if (!Bind(addrBind, BF_REPORT_ERROR, NetPermissionFlags::None)) {
+        if (!Bind(addrBind, BF_REPORT_ERROR, NetPermissionFlags::None, "p2p")) {
             return false;
         }
     }
     for (const auto& addrBind : options.vWhiteBinds) {
-        if (!Bind(addrBind.m_service, BF_REPORT_ERROR, addrBind.m_flags)) {
+        if (!Bind(addrBind.m_service, BF_REPORT_ERROR, addrBind.m_flags, "white-p2p")) {
             return false;
         }
     }
     for (const auto& addr_bind : options.onion_binds) {
-        if (!Bind(addr_bind, BF_REPORT_ERROR | BF_DONT_ADVERTISE, NetPermissionFlags::None)) {
+        if (!Bind(addr_bind, BF_REPORT_ERROR | BF_DONT_ADVERTISE, NetPermissionFlags::None, "onion-p2p")) {
             return false;
         }
     }
@@ -3218,12 +3218,12 @@ bool CConnman::InitBinds(const Options& options)
         // may not have IPv6 support and the user did not explicitly ask us to
         // bind on that.
         const CService ipv6_any{in6_addr(IN6ADDR_ANY_INIT), GetListenPort()}; // ::
-        Bind(ipv6_any, BF_NONE, NetPermissionFlags::None);
+        Bind(ipv6_any, BF_NONE, NetPermissionFlags::None, "p2p");
 
         struct in_addr inaddr_any;
         inaddr_any.s_addr = htonl(INADDR_ANY);
         const CService ipv4_any{inaddr_any, GetListenPort()}; // 0.0.0.0
-        if (!Bind(ipv4_any, BF_REPORT_ERROR, NetPermissionFlags::None)) {
+        if (!Bind(ipv4_any, BF_REPORT_ERROR, NetPermissionFlags::None, "p2p")) {
             return false;
         }
     }

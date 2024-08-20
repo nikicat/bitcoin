@@ -92,7 +92,7 @@ bool SplitHostPort(std::string_view in, uint16_t& portOut, std::string& hostOut)
         if (ParseUInt16(in.substr(colon + 1), &n)) {
             in = in.substr(0, colon);
             portOut = n;
-            valid = (portOut != 0);
+            valid = true;
         }
     } else {
         valid = true;

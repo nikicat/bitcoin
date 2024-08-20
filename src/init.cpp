@@ -1309,7 +1309,7 @@ bool AppInitMain(NodeContext& node, interfaces::BlockAndHeaderTipInfo* tip_info)
         if (args.IsArgSet(port_option)) {
             const std::string port = args.GetArg(port_option, "");
             uint16_t n;
-            if (!ParseUInt16(port, &n) || n == 0) {
+            if (!ParseUInt16(port, &n)) {
                 return InitError(InvalidPortErrMsg(port_option, port));
             }
         }
