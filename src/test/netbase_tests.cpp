@@ -78,7 +78,7 @@ bool static TestSplitHost(const std::string& test, const std::string& host, uint
 {
     std::string hostOut;
     uint16_t portOut{0};
-    bool validPortOut = SplitHostPort(test, portOut, hostOut);
+    auto [presentPortOut, validPortOut] = SplitHostPort(test, portOut, hostOut);
     return hostOut == host && portOut == port && validPortOut == validPort;
 }
 

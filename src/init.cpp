@@ -1332,7 +1332,8 @@ bool AppInitMain(NodeContext& node, interfaces::BlockAndHeaderTipInfo* tip_info)
         for (const std::string& socket_addr : args.GetArgs(arg)) {
             std::string host_out;
             uint16_t port_out{0};
-            if (!SplitHostPort(socket_addr, port_out, host_out)) {
+            auto [portPresent, portValid] = SplitHostPort(socket_addr, port_out, host_out);
+            if (!portValid) {
 #ifdef HAVE_SOCKADDR_UN
                 // Allow unix domain sockets for some options e.g. unix:/some/file/path
                 if (!unix || socket_addr.find(ADDR_PREFIX_UNIX) != 0) {
@@ -1349,7 +1350,8 @@ bool AppInitMain(NodeContext& node, interfaces::BlockAndHeaderTipInfo* tip_info)
         std::string host_out;
         uint16_t port_out{0};
         std::string bind_socket_addr = socket_addr.substr(0, socket_addr.rfind('='));
-        if (!SplitHostPort(bind_socket_addr, port_out, host_out)) {
+        auto [portPresent, portValid] = SplitHostPort(bind_socket_addr, port_out, host_out);
+        if (!portValid) {
             return InitError(InvalidPortErrMsg("-bind", socket_addr));
         }
     }

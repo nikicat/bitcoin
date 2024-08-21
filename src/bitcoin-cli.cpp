@@ -752,17 +752,16 @@ static UniValue CallRPC(BaseRequestHandler* rh, const std::string& strMethod, co
     {
         uint16_t rpcconnect_port{0};
         const std::string rpcconnect_str = gArgs.GetArg("-rpcconnect", DEFAULT_RPCCONNECT);
-        if (!SplitHostPort(rpcconnect_str, rpcconnect_port, host)) {
+        auto [portPresent, portValid] = SplitHostPort(rpcconnect_str, rpcconnect_port, host);
+        if (!portValid || (portPresent && rpcconnect_port == 0)) {
             // Uses argument provided as-is
             // (rather than value parsed)
             // to aid the user in troubleshooting
             throw std::runtime_error(strprintf("Invalid port provided in -rpcconnect: %s", rpcconnect_str));
-        } else {
-            if (rpcconnect_port != 0) {
-                // Use the valid port provided in rpcconnect
-                port = rpcconnect_port;
-            } // else, no port was provided in rpcconnect (continue using default one)
-        }
+        } else if (portPresent) {
+            // Use the valid port provided in rpcconnect
+            port = rpcconnect_port;
+        } // else, no port was provided in rpcconnect (continue using default one)
 
         if (std::optional<std::string> rpcport_arg = gArgs.GetArg("-rpcport")) {
             // -rpcport was specified

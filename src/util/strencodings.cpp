@@ -79,8 +79,9 @@ std::optional<std::vector<Byte>> TryParseHex(std::string_view str)
 template std::optional<std::vector<std::byte>> TryParseHex(std::string_view);
 template std::optional<std::vector<uint8_t>> TryParseHex(std::string_view);
 
-bool SplitHostPort(std::string_view in, uint16_t& portOut, std::string& hostOut)
+std::tuple<bool, bool> SplitHostPort(std::string_view in, uint16_t& portOut, std::string& hostOut)
 {
+    bool present = false;
     bool valid = false;
     size_t colon = in.find_last_of(':');
     // if a : is found, and it either follows a [...], or no other : is in the string, treat it as port separator
@@ -88,6 +89,7 @@ bool SplitHostPort(std::string_view in, uint16_t& portOut, std::string& hostOut)
     bool fBracketed = fHaveColon && (in[0] == '[' && in[colon - 1] == ']'); // if there is a colon, and in[0]=='[', colon is not 0, so in[colon-1] is safe
     bool fMultiColon{fHaveColon && colon != 0 && (in.find_last_of(':', colon - 1) != in.npos)};
     if (fHaveColon && (colon == 0 || fBracketed || !fMultiColon)) {
+        present = true;
         uint16_t n;
         if (ParseUInt16(in.substr(colon + 1), &n)) {
             in = in.substr(0, colon);
@@ -103,7 +105,7 @@ bool SplitHostPort(std::string_view in, uint16_t& portOut, std::string& hostOut)
         hostOut = in;
     }
 
-    return valid;
+    return {present, valid};
 }
 
 std::string EncodeBase64(Span<const unsigned char> input)
